@@ -25,7 +25,7 @@ data_shape = [-1, 64, 64, 1]
 
 # 定义训练参数
 epochs = 1
-batch_size = 1
+batch_size = 25
 n_samples = 101
 
 # 生成屏蔽区域
@@ -96,8 +96,6 @@ def train(data_train):
     
     # 读取png版本
     test_img = random.sample(data_train, batch_size)
-    y = test_img[0]
-    test_img = [y for x in test_img]
     test_img = np.array(test_img)
     test_img = test_img.reshape((batch_size, data_shape[1], data_shape[2], data_shape[3]))
     plot_images(np.squeeze(test_img, -1)) # 显示完整图像

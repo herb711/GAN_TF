@@ -3,7 +3,7 @@
 从数据集中读取文字图片
 '''
 
-
+import gc
 import numpy as np
 import matplotlib.pyplot as plt
 from skimage import io
@@ -71,18 +71,25 @@ def getdata(data_dir):
     chunks = np.float32(chunks)
     data = (chunks)/65535 # 归一化 0-1;  -1~1: x/128-1
     data = data * 2 - 1 # scale to -1, 1
+    
+    for x in locals().keys():
+      del locals()[x]
+    gc.collect()
     return data.tolist()
 
 def read_yizu():
 
     #获取训练数据集
-    data_train = getdata('../dataset/yizu/images64/train/')
+    data_train = getdata('../../dataset/yizu/images64/train/')
     
     #获取测试数据集
-    data_test = getdata('../dataset/yizu/images64/test/')
+    data_test = getdata('../../dataset/yizu/images64/test/')
     
     print(len(data_train),  len(data_test))
-            
+
+    for x in locals().keys():
+      del locals()[x]
+    gc.collect()
     return data_train, data_test
 
 
