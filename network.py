@@ -141,6 +141,7 @@ def get_loss(inputs_real, inputs_noise, image_depth, smooth=0.05):
     
     # 计算Loss
     g_loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=d_logits_fake, 
+                                                                    #labels=inputs_real*(1-smooth)))
                                                                     labels=tf.ones_like(d_outputs_fake)*(1-smooth))) # ones_like全部值置为1
     
     d_loss_real = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=d_logits_real,
@@ -187,39 +188,53 @@ def get_optimizer(g_loss, d_loss, beta1=0.4, learning_rate=0.001):
 
 def get_opt_z(noise_size, data_shape, inputs_real, mask_np, learning_rate=0.001) :
     """
-    @Author: zhushiyu
+    @ Author: zhushiyu
     --------------------
-    @param noise_size: 噪声size
-    @param data_shape: 真实图像shape
-    @batch_size:
-    @n_samples: 显示示例图片数量
-    
+    输入参数
+    @ noise_size: 生成器的输入为随机噪声，这里设置噪声的长度
+    @ data_shape: 生成器生成出来的图像的shape
+    @ inputs_real:      输入的待修复的图像
+    @ mask_np:          屏蔽的区域
+    @ learning_rate:    学习率
+    --------------------
+    返回值
+    z_opt:   运行开关，进行学习需要
+    layer_z: 生成器的输入，每次根据此模型而进行改变
+    complete_loss: 总的损失值
+    --------------------    
     # 寻找与待修复图像最接近的伪图像 
+    
     """
     
     # 生成器的输入
-    z = tf.random_uniform([noise_size], -1.0, 1.0)
-    var_z = tf.Variable(initial_value=z, name='batch_z', dtype=tf.float32)
-    layer_z = tf.reshape(var_z, [1, noise_size])
+    z = tf.random_uniform([noise_size], -1.0, 1.0) # 随机噪声，用于初始化
+    var_z = tf.Variable(initial_value=z, name='batch_z', dtype=tf.float32) # 建立变量, 初始值是随机噪声，之后随模型优化改变
+    layer_z = tf.reshape(var_z, [1, noise_size]) # 数据类型进行变化。因为每次只输入一个数据，因此是[1, noise_size]
 
     # 生成屏蔽器
     mask_np_ = mask_np.reshape(1, data_shape[1], data_shape[2], data_shape[3])
     mask = tf.constant(value=mask_np_, dtype=tf.float32)
 
-    # 模型结构
+    # 双判别器模型结构，获取判别器1计算出的结果
     z_images = get_generator(layer_z, data_shape[-1], False) # in (1x100)  out (1x64x64x1)
     z_logits_fake, z_outputs_fake = get_discriminator(z_images, reuse=True) # in (1x64x64x1)  out (1)
     z_loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=z_logits_fake, 
                                                                     labels=tf.ones_like(z_outputs_fake)*(1-0.1))) # 计算Loss
-    
-    b_img = tf.reshape(inputs_real[0], [1, data_shape[1], data_shape[2], 1]) 
-    contextual0 = tf.multiply(mask, z_images) - tf.multiply(mask, b_img) # mask (1x64x64x1)  z_images (1x64x64x1)  b_img (1x64x64x1)
-    contextual1 =  tf.contrib.layers.flatten( tf.abs( contextual0 ) )
-    contextual_loss = tf.reduce_sum( contextual1, 1 ) # 伪图像跟真实图像接近情况    
-    
     perceptual_loss = z_loss # 判别器认定为真的情况
+    
+    # 计算生成图像和原始图像差异的loss值，即伪图像跟真实图像接近情况
+    b_img = tf.reshape(inputs_real[0], [1, data_shape[1], data_shape[2], 1]) 
+    contextual0 = tf.multiply(mask, z_images) - tf.multiply(mask, b_img) # 首先和非屏蔽区域相乘，把需要修补的部分排除在外；然后两幅图相减获取差距
+    contextual1 =  tf.contrib.layers.flatten( tf.abs( contextual0 ) ) # 将差值的绝对值，转为一个维度
+    contextual_loss = tf.reduce_sum( contextual1, 1 ) # 将所有节点的值求和
+
+    # 合并2个loss值
     complete_loss = contextual_loss + 0.99 * perceptual_loss
+    
+    # 梯度下降法求最佳值
     grad_z = tf.gradients(complete_loss, var_z) 
+    
+    # 更新z值
     learn_z = tf.constant(value=learning_rate, dtype=tf.float32) # 设置学习率
     z_opt = var_z.assign(var_z - learn_z * tf.reshape(grad_z, [noise_size])) # 将 1x100 转换为 100
     
