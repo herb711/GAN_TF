@@ -49,11 +49,14 @@ def plot_images(n, samples):
     fig.tight_layout(pad=0)
     
     # 保存图片
+    plotPath = os.getcwd() + r'/checkpoints'
+    if not os.path.exists(plotPath): # 如果目录不存在，新建
+        os.mkdir(plotPath)
     plotPath = os.getcwd() + r'/checkpoints/imgs'
     if not os.path.exists(plotPath): # 如果目录不存在，新建
         os.mkdir(plotPath)
 
-    plt.savefig(plotPath + str(n) + '.png')
+    plt.savefig(plotPath + '/' + str(n) + '.png')
     plt.show()
     
 
@@ -162,7 +165,11 @@ def train(data_train):
                       "D_Loss: {:.4f}....".format(train_loss_d),
                       "G_Loss: {:.4f}....". format(train_loss_g),
                       "Z_Loss: {:.4f}....". format(np.mean(train_loss_z)))
-        # 保存模型
+                
+                # 每10次保存1次模型
+                saver.save(sess, './checkpoints/generator.ckpt')
+
+        # 训练结束保存模型
         saver.save(sess, './checkpoints/generator.ckpt')
 
     return losses
