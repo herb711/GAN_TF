@@ -13,7 +13,13 @@ import pickle
 import loader_yizu as loader
 import network as net
 
-
+# 保存数据目录 r'D:\zhushiyu\git\yizu_word'
+checkpointsPath = os.getcwd() + r'/checkpoints'
+if not os.path.exists(checkpointsPath): # 如果目录不存在，新建
+    os.mkdir(checkpointsPath)
+plotPath = os.getcwd() + r'/checkpoints/imgs'
+if not os.path.exists(plotPath): # 如果目录不存在，新建
+    os.mkdir(plotPath)
 
 # 定义模型参数
 learning_rate = 0.001 # 学习率
@@ -47,14 +53,6 @@ def plot_images(n, samples):
         ax.get_xaxis().set_visible(False)
         ax.get_yaxis().set_visible(False)
     fig.tight_layout(pad=0)
-    
-    # 保存图片
-    plotPath = os.getcwd() + r'/checkpoints'
-    if not os.path.exists(plotPath): # 如果目录不存在，新建
-        os.mkdir(plotPath)
-    plotPath = os.getcwd() + r'/checkpoints/imgs'
-    if not os.path.exists(plotPath): # 如果目录不存在，新建
-        os.mkdir(plotPath)
 
     plt.savefig(plotPath + '/' + str(n) + '.png')
     #plt.show()
@@ -120,9 +118,7 @@ def train(data_train, data_test):
         sess.run(tf.global_variables_initializer()) # 变量初始化
         
         # 载入模型
-        
-        modelone_path = './checkpoints/'
-        ckpt = tf.train.get_checkpoint_state(modelone_path) # 通过checkpoint文件自动找到目录中最新模型的文件名
+        ckpt = tf.train.get_checkpoint_state(checkpointsPath) # 通过checkpoint文件自动找到目录中最新模型的文件名
         if ckpt and ckpt.model_checkpoint_path:
             saver.restore(sess, ckpt.model_checkpoint_path) # 加载模型   
         
@@ -169,13 +165,14 @@ def train(data_train, data_test):
                 print("Epoch {}/{}....".format(e+1, epochs), 
                       "D_Loss: {:.4f}....".format(train_loss_d),
                       "G_Loss: {:.4f}....". format(train_loss_g),
-                      "Z_Loss: {:.4f}....". format(np.mean(train_loss_z)))
+                      "D_V_Loss: {:.4f}....". format(test_loss_d))
+                      #"Z_Loss: {:.4f}....". format(np.mean(train_loss_z)))
                 
                 # 每10次保存1次模型
-                saver.save(sess, './checkpoints/generator.ckpt')
+                saver.save(sess, checkpointsPath + r'/generator.ckpt')
 
         # 训练结束保存模型
-        saver.save(sess, './checkpoints/generator.ckpt')
+        saver.save(sess, checkpointsPath + r'/generator.ckpt')
 
     return losses
 
@@ -189,12 +186,12 @@ if __name__=="__main__":
     # 训练
     with tf.Graph().as_default():
         losses = train(batchs, data_test)
-        with open('./checkpoints/train_losses.pkl', 'wb') as f:
+        with open(checkpointsPath + r'/train_losses.pkl', 'wb') as f:
             pickle.dump(losses, f)
             f.close()
     
     # 显示
-    with open('./checkpoints/train_losses.pkl', 'rb') as f:
+    with open(checkpointsPath + r'/train_losses.pkl', 'rb') as f:
         losses = pickle.load(f)
         f.close()
         
@@ -203,10 +200,13 @@ if __name__=="__main__":
         #plt.plot(losses.T[0]+losses.T[1], label='Discriminator Total Loss')
         plt.plot(losses.T[0], label='Discriminator Loss')
         plt.plot(losses.T[1], label='Generator Loss')
-        plt.plot(losses.T[2], label='Z Loss')
+        #plt.plot(losses.T[2], label='Z Loss')
         plt.title("Training Losses")
         plt.legend()
+        plt.savefig(checkpointsPath + r'/tarin_losses.png')
         plt.show()
+        
+
     
     
 
