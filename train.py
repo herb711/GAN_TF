@@ -57,8 +57,9 @@ def plot_images(n, samples):
         os.mkdir(plotPath)
 
     plt.savefig(plotPath + '/' + str(n) + '.png')
-    plt.show()
-    
+    #plt.show()
+    #plt.pause(6)# 间隔的秒数：6s
+    plt.close()
 
 def show_generator_output(sess, examples_noise, inputs_noise, output_dim):
     """
@@ -79,7 +80,7 @@ def show_generator_output(sess, examples_noise, inputs_noise, output_dim):
     return result
 
 
-def train(data_train):
+def train(data_train, data_test):
     """
     @Author: zhushiyu
     --------------------
@@ -144,18 +145,22 @@ def train(data_train):
                                                  inputs_noise: batch_noise})
             
             if steps % n_samples == 0:
+                train_loss_g = g_loss.eval({inputs_real: batch_images,
+                                            inputs_noise: batch_noise})
                 train_loss_d = d_loss.eval({inputs_real: batch_images,
                                             inputs_noise: batch_noise})
-                train_loss_g = g_loss.eval({inputs_real: batch_images,
+                
+                test_images, _ = next(data_test)                
+                test_loss_d = d_loss.eval({inputs_real: test_images,
                                             inputs_noise: batch_noise})
 
                 # 寻找最佳的伪图像
                 batch_mix = [batch_images[0]]
-                for i in range(2000):
+                for i in range(2):# 2000
                     _, train_img_z, train_loss_z = sess.run([z_train_opt, z_img, z_loss], 
                                                feed_dict={inputs_real: batch_mix})
                     
-                losses.append((train_loss_d, train_loss_g, train_loss_z))
+                losses.append((train_loss_d, test_loss_d, train_loss_g, train_loss_z))
                 
                 # 显示图片
                 samples = show_generator_output(sess, batch_noise, inputs_noise, data_shape[-1])
@@ -178,11 +183,12 @@ if __name__=="__main__":
 
     # 读取数据
     #data_train, data_test = loader.read_yizu_batch(batch_size)
-    batchs = loader.read_batch(loader.TEST_DIR,batch_size)
+    data_test = loader.read_batch(loader.TEST_DIR,batch_size)
+    batchs = loader.read_batch(loader.TRAIN_DIR,batch_size)
     
     # 训练
     with tf.Graph().as_default():
-        losses = train(batchs)
+        losses = train(batchs, data_test)
         with open('./checkpoints/train_losses.pkl', 'wb') as f:
             pickle.dump(losses, f)
             f.close()
