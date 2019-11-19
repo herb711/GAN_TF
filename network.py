@@ -224,12 +224,13 @@ def get_opt_z(noise_size, data_shape, inputs_real, mask_np, learning_rate=0.001)
     
     # 计算生成图像和原始图像差异的loss值，即伪图像跟真实图像接近情况
     b_img = tf.reshape(inputs_real[0], [1, data_shape[1], data_shape[2], 1]) 
-    contextual0 = tf.multiply(mask, z_images) - tf.multiply(mask, b_img) # 首先和非屏蔽区域相乘，把需要修补的部分排除在外；然后两幅图相减获取差距
+    contextual0 = tf.multiply(mask, z_images) - b_img # 首先和非屏蔽区域相乘，把需要修补的部分排除在外；然后两幅图相减获取差距
     contextual1 =  tf.contrib.layers.flatten( tf.abs( contextual0 ) ) # 将差值的绝对值，转为一个维度
     contextual_loss = tf.reduce_sum( contextual1, 1 ) # 将所有节点的值求和
+    #contextual_loss = tf.reduce_mean( contextual1, 1 ) # 将所有节点的值求均值
 
     # 合并2个loss值
-    complete_loss = contextual_loss + 0.99 * perceptual_loss
+    complete_loss = contextual_loss + perceptual_loss # 因为像素差值很大，因此判别器的结果影响很小
     
     # 梯度下降法求最佳值
     grad_z = tf.gradients(complete_loss, var_z) 

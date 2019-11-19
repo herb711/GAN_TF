@@ -4,16 +4,25 @@
 训练模型
 '''
 
-import os
 import tensorflow as tf
 import numpy as np
 import matplotlib.pyplot as plt
 import pickle
 import random
 
-import loader_yizu as loader
 import network as net
 
+import sys
+sys.path.append("..")
+import libs.unit as unit
+from libs.unit import mkdir,clear_OOM
+import libs.loader_mnist as loader
+#import libs.loader_yizu as loader
+
+# 解决内存泄露问题
+clear_OOM()
+# 新建目录
+mkdir(loader)
 
 
 # 定义模型参数
@@ -30,15 +39,6 @@ epochs_z = 2000
 batch_size = 1 # 只能设置成1 因为每一副图对应的都不一样
 n_samples = 1
 
-# 生成屏蔽区域
-m = 20
-n = 40
-mask_np = np.ones([data_shape[1],data_shape[2]]) #生成一个64x64的全1矩阵
-mask_np[m:n, m:n]= 0
-
-mask_np0 = np.zeros([data_shape[1],data_shape[2]]) #生成一个64x64的全0矩阵
-mask_np0[m:n, m:n]= 1
-
     
 def plot_images3(n, samples):
     fig, axes = plt.subplots(nrows=1, ncols=4, sharex=True, sharey=True, figsize=(25,8))
@@ -49,11 +49,7 @@ def plot_images3(n, samples):
     fig.tight_layout(pad=0)
     
     # 保存图片
-    plotPath = os.getcwd() + "\\checkpoints\\fiximgs\\"
-    if not os.path.exists(plotPath): # 如果目录不存在，新建
-        os.mkdir(plotPath)
-
-    plt.savefig(plotPath + str(n) + '.png')
+    plt.savefig(loader.FIX_IMAGE_DIR + '/' + str(n) + '.png')
     plt.show()
     
 
@@ -86,19 +82,20 @@ def train_z(data_test, noise_size, data_shape, n_samples):
     @n_samples: 显示示例图片数量
     """
     
+    mask_np1 = unit.mask_square(data_shape[1], data_shape[2])# 生成一副与图象同样大小的屏蔽图 
+    
     inputs_real, inputs_noise = net.get_inputs(noise_size, data_shape[1], data_shape[2], data_shape[3])
     g_loss, d_loss = net.get_loss(inputs_real, inputs_noise, data_shape[-1])
     g_train_opt, d_train_opt = net.get_optimizer(g_loss, d_loss, beta1, learning_rate)
 
-    z_train_opt, z_img, z_loss = net.get_opt_z(noise_size, data_shape, inputs_real, mask_np, learning_rate)
+    z_train_opt, z_img, z_loss = net.get_opt_z(noise_size, data_shape, inputs_real, mask_np1, learning_rate)
       
     # 保存生成器变量
     saver = tf.train.Saver()
     
 
     with tf.Session() as sess: # 在默认的图上创建会话
-        modelone_path = './checkpoints/'
-        ckpt = tf.train.get_checkpoint_state(modelone_path) # 通过checkpoint文件自动找到目录中最新模型的文件名
+        ckpt = tf.train.get_checkpoint_state(loader.MODEL_DIR) # 通过checkpoint文件自动找到目录中最新模型的文件名
         if ckpt and ckpt.model_checkpoint_path:
             saver.restore(sess, ckpt.model_checkpoint_path) # 加载模型    
             for n in range(epochs):
@@ -106,9 +103,8 @@ def train_z(data_test, noise_size, data_shape, n_samples):
                 test_img, _ = next(data_test)
                 test_img = test_img.reshape(data_shape[1], data_shape[2])
                 #plot_images(np.squeeze(test_img, -1)) # 显示完整图像
-    
-                # 生成待修复图像
-                batch_mix = [np.multiply(mask_np, test_img) for x in range(batch_size)] # 点乘
+                    
+                batch_mix = [np.multiply(mask_np1, test_img) for x in range(batch_size)] # 点乘
                 batch_mix = np.array(batch_mix)
                 batch_mix = batch_mix.reshape((batch_size, data_shape[1], data_shape[2], data_shape[3]))
                 #plot_images(np.squeeze(batch_mix, -1)) # 显示残缺图像    
@@ -126,6 +122,7 @@ def train_z(data_test, noise_size, data_shape, n_samples):
                 zz_img = zz_img.reshape(data_shape[1], data_shape[2])
     
                 # 进行修复
+                mask_np0 = 1-mask_np1
                 fix_img = np.multiply(mask_np0, zz_img)  + batch_mix[0].reshape(data_shape[1], data_shape[2])
                 #plot_images(fix_img.reshape((1, 64, 64))) # 显示修补之后的图像
     
