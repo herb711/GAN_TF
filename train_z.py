@@ -4,11 +4,10 @@
 训练模型
 '''
 
+import os
 import tensorflow as tf
 import numpy as np
 import matplotlib.pyplot as plt
-import pickle
-import random
 
 import network as net
 
@@ -34,7 +33,7 @@ noise_size = 100
 data_shape = [-1, 64, 64, 1]
 
 # 定义训练参数
-epochs = 5
+epochs = 1000
 epochs_z = 2000
 batch_size = 1 # 只能设置成1 因为每一副图对应的都不一样
 n_samples = 1
@@ -51,6 +50,7 @@ def plot_images3(n, samples):
     # 保存图片
     plt.savefig(loader.FIX_IMAGE_DIR + '/' + str(n) + '.png')
     plt.show()
+    plt.close()
     
 
 def show_generator_output(sess, examples_noise, inputs_noise, output_dim):
@@ -72,6 +72,28 @@ def show_generator_output(sess, examples_noise, inputs_noise, output_dim):
     return result
 
 
+def save_generator_output(img, mdir, name):
+    """
+    @Author: zhushiyu
+    将是生成的图像存储在本地
+    --------------------
+    @param img: 存储的图像
+    @param mdir: 存储的地址
+    """
+    
+    fig, axes = plt.subplots(nrows=1, ncols=1, sharex=True, sharey=True, figsize=(data_shape[1],data_shape[2]))
+    axes.imshow(img.reshape((data_shape[1],data_shape[2])), cmap='Greys_r')
+    axes.get_xaxis().set_visible(False)
+    axes.get_yaxis().set_visible(False)
+    fig.tight_layout(pad=0)
+        
+    if not os.path.exists(mdir):
+        os.makedirs(mdir)
+    plt.savefig(mdir + '/' + str(name) + '.png')
+    
+    plt.close()
+
+
 
 def train_z(data_test, noise_size, data_shape, n_samples):
     """
@@ -82,7 +104,7 @@ def train_z(data_test, noise_size, data_shape, n_samples):
     @n_samples: 显示示例图片数量
     """
     
-    mask_np1 = unit.mask_square(data_shape[1], data_shape[2])# 生成一副与图象同样大小的屏蔽图 
+    mask_np1 = unit.mask_triangle(data_shape[1], data_shape[2])# 生成一副与图象同样大小的屏蔽图 
     
     inputs_real, inputs_noise = net.get_inputs(noise_size, data_shape[1], data_shape[2], data_shape[3])
     g_loss, d_loss = net.get_loss(inputs_real, inputs_noise, data_shape[-1])
@@ -100,7 +122,7 @@ def train_z(data_test, noise_size, data_shape, n_samples):
             saver.restore(sess, ckpt.model_checkpoint_path) # 加载模型    
             for n in range(epochs):
                 # 读取png图片---从测试集中读取
-                test_img, _ = next(data_test)
+                test_img, test_label = next(data_test)
                 test_img = test_img.reshape(data_shape[1], data_shape[2])
                 #plot_images(np.squeeze(test_img, -1)) # 显示完整图像
                     
@@ -134,8 +156,23 @@ def train_z(data_test, noise_size, data_shape, n_samples):
                 samples.append(fix_img)
                 plot_images3(n, samples)
                 
+                num = loader.predic_label_h(test_label) # 求出数字实际值
+
+                #plt.imshow(test_img, cmap='Greys_r')
+                #plt.savefig(loader.FIX_IMAGE_DIR1 + '/' + str(n) + '.png')
+                
+                mdir = loader.FIX_IMAGE_DIR2 + '/' + str(num)
+                save_generator_output(batch_mix[0], mdir, n)
+                
+                #plt.imshow(zz_img, cmap='Greys_r')
+                #plt.savefig(loader.FIX_IMAGE_DIR3 + '/' + str(n) + '.png')
+
+                mdir = loader.FIX_IMAGE_DIR4 + '/' + str(num)
+                save_generator_output(fix_img, mdir, n)
+                               
                 plt.plot(losses)
                 plt.show()
+                plt.close()
 
 
 if __name__=="__main__":
