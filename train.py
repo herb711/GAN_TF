@@ -6,6 +6,8 @@
 
 import tensorflow as tf
 import numpy as np
+import matplotlib
+matplotlib.rcParams['backend']='SVG'
 import matplotlib.pyplot as plt
 import pickle
 
@@ -14,8 +16,8 @@ import network as net
 import sys
 sys.path.append("..")
 from libs.unit import mkdir,clear_OOM
-import libs.loader_mnist as loader
-#import libs.loader_yizu as loader
+#import libs.loader_mnist as loader
+import libs.loader_yizu as loader
 
     
 # 解决内存泄露问题
@@ -30,23 +32,24 @@ beta1 = 0.4
 
 # 定义输入输出参数
 noise_size = 100
-data_shape = [-1, 64, 64, 1]
+data_shape = [-1, loader.input_shape[0], loader.input_shape[1], loader.input_shape[2]]
 
 # 定义训练参数
-epochs = 2000
+epochs = 10000
 batch_size = 25
-n_samples = 10
+n_samples = 1000
 
 
 def plot_images(n, samples):
     fig, axes = plt.subplots(nrows=1, ncols=25, sharex=True, sharey=True, figsize=(50,2))
     for img, ax in zip(samples, axes):
-        ax.imshow(img.reshape((64, 64)), cmap='Greys_r')
+        ax.imshow(img.reshape((data_shape[1], data_shape[2])), cmap='Greys_r')
         ax.get_xaxis().set_visible(False)
         ax.get_yaxis().set_visible(False)
     fig.tight_layout(pad=0)
 
-    plt.savefig(loader.GAN_IMAGE_DIR + '/' + str(n) + '.png')
+    plt.savefig(loader.GAN_IMAGE_DIR + '/' + str(n) + '.svg',format='svg')
+    #plt.savefig(loader.GAN_IMAGE_DIR + '/' + str(n) + '.png')
     #plt.show()
     #plt.pause(6)# 间隔的秒数：6s
     plt.close()
@@ -84,7 +87,7 @@ def train(data_train, data_test):
     # 存储loss
     losses = []
     steps = 0
-    mask_np1 = unit.mask_img(data_shape[1], data_shape[2])# 生成一副与图象同样大小的屏蔽图 
+    mask_np1 = unit.mask_square(data_shape[1], data_shape[2])# 生成一副与图象同样大小的屏蔽图 
     
     inputs_real, inputs_noise = net.get_inputs(noise_size, data_shape[1], data_shape[2], data_shape[3])
     g_loss, d_loss = net.get_loss(inputs_real, inputs_noise, data_shape[-1])
@@ -156,12 +159,12 @@ def train(data_train, data_test):
 
                 print("Epoch {}/{}....".format(e+1, epochs), 
                       "D_Loss: {:.4f}....".format(train_loss_d),
-                      "G_Loss: {:.4f}....". format(train_loss_g),
-                      "D_V_Loss: {:.4f}....". format(test_loss_d))
+                      "G_Loss: {:.4f}....". format(train_loss_g))
+                      #"D_V_Loss: {:.4f}....". format(test_loss_d),
                       #"Z_Loss: {:.4f}....". format(np.mean(train_loss_z)))
                 
                 # 每10次保存1次模型
-                saver.save(sess, loader.MODEL_DIR + r'/generator.ckpt')
+                saver.save(sess, loader.MODEL_DIR + r'/generator'+ str(steps) + '.ckpt')
 
         # 训练结束保存模型
         saver.save(sess, loader.MODEL_DIR + r'/generator.ckpt')
@@ -174,15 +177,17 @@ if __name__=="__main__":
     data_test = loader.read_batch(loader.TEST_DIR,batch_size)
     batchs = loader.read_batch(loader.TRAIN_DIR,batch_size)
     
+    lossdir = os.path.join(loader.HISTORY_DIR, 'DCGAN-gan') + '.loss.pl'
+    
     # 训练
     with tf.Graph().as_default():
         losses = train(batchs, data_test)
-        with open(loader.HISTORY_DIR + r'/train_losses.pkl', 'wb') as f:
+        with open(lossdir, 'wb') as f:
             pickle.dump(losses, f)
             f.close()
     
     # 显示
-    with open(loader.HISTORY_DIR + r'/train_losses.pkl', 'rb') as f:
+    with open(lossdir, 'rb') as f:
         losses = pickle.load(f)
         f.close()
         
@@ -194,7 +199,9 @@ if __name__=="__main__":
         #plt.plot(losses.T[2], label='Z Loss')
         plt.title("Training Losses")
         plt.legend()
-        plt.savefig(loader.HISTORY_DIR + r'/tarin_losses.png')
+        #plt.savefig(loader.HISTORY_DIR + r'/tarin_losses.png')
+        imgdir = os.path.join(loader.HISTORY_DIR, 'DCGAN-gan') + '.loss.svg'
+        plt.savefig(imgdir,format='svg')
         plt.show()
         
 
